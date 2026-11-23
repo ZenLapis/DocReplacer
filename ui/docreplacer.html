@@ -1,0 +1,590 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<title>DocReplacer</title>
+<style>
+:root{
+  --bg:#0E0F11; --side:#0B0C0E; --panel:#141518; --raised:#1A1C20; --hover:#202227;
+  --line:rgba(255,255,255,.065); --line2:rgba(255,255,255,.11);
+  --text:#ECEDEF; --muted:#8B9099; --faint:#5C616A;
+  --accent:#6F9BFF; --accent-ink:#0B1222; --accent-soft:rgba(111,155,255,.12);
+  --ok:#4CC38A; --ok-soft:rgba(76,195,138,.12); --warn:#E5B454; --warn-soft:rgba(229,180,84,.12);
+  --err:#F0646E; --err-soft:rgba(240,100,110,.12);
+  --r:10px; --r-sm:7px;
+  font-family:"Segoe UI Variable Text","Segoe UI",system-ui,sans-serif;
+}
+*{box-sizing:border-box;margin:0}
+html,body{height:100%;background:var(--bg);color:var(--text);font-size:13.5px;-webkit-font-smoothing:antialiased;overflow:hidden}
+button,input,textarea{font:inherit;color:inherit}
+::selection{background:var(--accent-soft)}
+::-webkit-scrollbar{width:10px;height:10px}::-webkit-scrollbar-thumb{background:#2a2c31;border-radius:10px;border:3px solid var(--bg)}::-webkit-scrollbar-track{background:transparent}
+.app{display:grid;grid-template-columns:232px 1fr;height:100vh}
+/* sidebar */
+aside{background:var(--side);border-right:1px solid var(--line);display:flex;flex-direction:column;padding:18px 12px}
+.brand{display:flex;align-items:center;gap:10px;padding:4px 8px 22px}
+.mark{width:30px;height:30px;border-radius:8px;background:var(--accent);display:grid;place-items:center;color:var(--accent-ink)}
+.brand b{font-family:"Segoe UI Variable Display","Segoe UI";font-weight:650;font-size:15px;letter-spacing:-.01em}
+.brand small{display:block;color:var(--faint);font-size:11px;margin-top:1px}
+.navlabel{color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;padding:0 10px 8px}
+nav button{width:100%;display:flex;align-items:center;gap:10px;padding:8px 10px;border:0;background:none;border-radius:var(--r-sm);color:var(--muted);cursor:pointer;text-align:left;font-weight:500}
+nav button:hover{background:var(--hover);color:var(--text)}
+nav button.on{background:var(--raised);color:var(--text);box-shadow:inset 0 0 0 1px var(--line)}
+nav button svg{opacity:.85}
+nav .count{margin-left:auto;font-size:11px;color:var(--faint);font-variant-numeric:tabular-nums}
+.sidefoot{margin-top:auto;padding:12px 10px 2px;border-top:1px solid var(--line);color:var(--faint);font-size:11.5px;line-height:1.5}
+.sidefoot .dot{display:inline-block;width:6px;height:6px;border-radius:50%;background:var(--ok);margin-right:6px;vertical-align:1px}
+.busy .sidefoot .dot{background:var(--accent);animation:pulse 1s infinite}
+@keyframes pulse{50%{opacity:.3}}
+/* main */
+main{display:flex;flex-direction:column;min-width:0;min-height:0}
+header{display:flex;align-items:flex-end;justify-content:space-between;gap:20px;padding:26px 36px 20px;border-bottom:1px solid var(--line)}
+header h1{font-family:"Segoe UI Variable Display","Segoe UI";font-size:21px;font-weight:650;letter-spacing:-.015em}
+header p{color:var(--muted);margin-top:4px}
+.scroll{flex:1;overflow:auto;padding:26px 36px 36px}
+.page{display:none;max-width:1120px}.page.on{display:block;animation:in .18s ease}
+@keyframes in{from{opacity:0;transform:translateY(3px)}}
+/* primitives */
+.card{background:var(--panel);border:1px solid var(--line);border-radius:var(--r)}
+.card-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px;border-bottom:1px solid var(--line)}
+.card-h h3{font-size:13px;font-weight:600}
+.card-b{padding:18px}
+.lbl{display:block;color:var(--muted);font-size:12px;font-weight:500;margin-bottom:7px}
+.hint{color:var(--faint);font-size:12px;margin-top:6px}
+.input{width:100%;height:38px;padding:0 12px;background:var(--bg);border:1px solid var(--line2);border-radius:var(--r-sm);outline:none;transition:border-color .12s,box-shadow .12s}
+.input:focus{border-color:var(--accent);box-shadow:0 0 0 3px var(--accent-soft)}
+textarea.input{height:auto;padding:10px 12px;resize:vertical;line-height:1.55}
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;height:36px;padding:0 14px;border-radius:var(--r-sm);border:1px solid var(--line2);background:var(--raised);cursor:pointer;font-weight:550;white-space:nowrap;transition:background .12s,border-color .12s,opacity .12s}
+.btn:hover{background:var(--hover);border-color:rgba(255,255,255,.16)}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.btn.primary:hover{filter:brightness(1.07)}
+.btn.ghost{background:none;border-color:transparent;color:var(--muted)}.btn.ghost:hover{color:var(--text);background:var(--hover)}
+.btn.lg{height:42px;padding:0 20px;font-size:14px}
+.btn:disabled{opacity:.45;pointer-events:none}
+.btn.sm{height:30px;padding:0 10px;font-size:12.5px}
+.iconbtn{width:30px;height:30px;display:grid;place-items:center;border-radius:6px;border:0;background:none;color:var(--faint);cursor:pointer}.iconbtn:hover{background:var(--hover);color:var(--text)}
+.pill{display:inline-flex;align-items:center;gap:6px;height:22px;padding:0 9px;border-radius:20px;font-size:11.5px;font-weight:600;background:var(--raised);color:var(--muted);white-space:nowrap}
+.pill.ok{background:var(--ok-soft);color:var(--ok)}.pill.warn{background:var(--warn-soft);color:var(--warn)}.pill.err{background:var(--err-soft);color:var(--err)}.pill.run{background:var(--accent-soft);color:var(--accent)}
+.pill.run::before{content:"";width:6px;height:6px;border-radius:50%;background:currentColor;animation:pulse 1s infinite}
+.switch{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.switch input{display:none}
+.switch .tr{width:34px;height:20px;border-radius:20px;background:#2b2e34;position:relative;transition:background .15s;flex:none}
+.switch .tr::after{content:"";position:absolute;top:3px;left:3px;width:14px;height:14px;border-radius:50%;background:#fff;transition:transform .15s}
+.switch input:checked+.tr{background:var(--accent)}.switch input:checked+.tr::after{transform:translateX(14px)}
+.switch b{font-weight:550;display:block}.switch small{color:var(--faint);font-size:12px}
+.drop{border:1.5px dashed var(--line2);border-radius:var(--r);display:flex;align-items:center;gap:16px;padding:18px 20px;cursor:pointer;transition:border-color .12s,background .12s}
+.drop:hover,.drop.over{border-color:var(--accent);background:var(--accent-soft)}
+.drop .ico{width:40px;height:40px;border-radius:9px;background:var(--raised);display:grid;place-items:center;color:var(--muted);flex:none}
+.drop b{display:block;font-weight:600}.drop span{color:var(--faint);font-size:12.5px}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.stack>*+*{margin-top:16px}
+.mono{font-family:"Cascadia Mono",Consolas,monospace;font-size:12px}
+.trunc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* single page */
+.single{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(300px,1fr);gap:20px;align-items:start}
+.source{display:flex;align-items:center;gap:16px;padding:18px}
+.source .ico{width:44px;height:44px;border-radius:10px;background:var(--accent-soft);color:var(--accent);display:grid;place-items:center;flex:none}
+.source .meta{min-width:0;flex:1}.source .meta b{display:block;font-size:14px;font-weight:600}
+.source .meta span{color:var(--faint);font-size:12px}
+.facts{display:grid;grid-template-columns:repeat(3,1fr);border-top:1px solid var(--line)}
+.facts div{padding:14px 18px;min-width:0}.facts div+div{border-left:1px solid var(--line)}
+.facts small{display:block;color:var(--faint);font-size:11.5px;margin-bottom:4px}.facts b{font-weight:600}
+.notice{display:flex;align-items:center;gap:12px;padding:12px 18px;border-top:1px solid var(--line);color:var(--muted);font-size:12.5px}
+.notice .grow{flex:1;min-width:0}
+.arrow{display:flex;align-items:center;gap:10px}
+.arrow .input{flex:1}
+.arrow svg{color:var(--faint);flex:none}
+.logo-slot{display:flex;align-items:center;gap:14px}
+.logo-box{width:64px;height:64px;border-radius:9px;background:var(--bg);border:1px solid var(--line2);display:grid;place-items:center;overflow:hidden;flex:none;color:var(--faint);cursor:pointer}
+.logo-box img{max-width:86%;max-height:86%;object-fit:contain}
+.output{padding:16px 18px;border-radius:var(--r-sm);background:var(--bg);border:1px solid var(--line)}
+.output small{color:var(--faint);font-size:11.5px}.output div{margin-top:4px;font-weight:550;word-break:break-word}
+.summary{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:14px 0}
+.summary div{background:var(--bg);border:1px solid var(--line);border-radius:var(--r-sm);padding:10px 12px}
+.summary b{display:block;font-size:18px;font-weight:650;font-variant-numeric:tabular-nums}.summary small{color:var(--faint);font-size:11.5px}
+.empty{padding:46px 20px;text-align:center;color:var(--faint)}
+.empty b{display:block;color:var(--muted);font-weight:600;margin:10px 0 4px}
+/* batch */
+.batch{display:grid;grid-template-columns:320px minmax(0,1fr);gap:20px;align-items:start}
+table{width:100%;border-collapse:collapse}
+th{color:var(--faint);font-size:11px;font-weight:600;letter-spacing:.05em;text-transform:uppercase;text-align:left;padding:10px 14px;border-bottom:1px solid var(--line)}
+td{padding:9px 14px;border-bottom:1px solid var(--line);vertical-align:middle}
+tr:last-child td{border-bottom:0}
+tbody tr:hover td{background:rgba(255,255,255,.015)}
+td .thumb{width:40px;height:40px;border-radius:7px;background:var(--bg);border:1px solid var(--line);display:grid;place-items:center;overflow:hidden;cursor:pointer;color:var(--faint)}
+td .thumb img{max-width:88%;max-height:88%;object-fit:contain}
+td input.cell{width:100%;height:32px;padding:0 9px;border:1px solid transparent;background:none;border-radius:6px;outline:none;font-weight:550}
+td input.cell:hover{border-color:var(--line2)}td input.cell:focus{border-color:var(--accent);background:var(--bg)}
+.toolbar{display:flex;align-items:center;gap:8px}
+.toolbar .grow{flex:1}
+/* bottom bar */
+.dock{border-top:1px solid var(--line);background:var(--side)}
+.dockbar{display:flex;align-items:center;gap:14px;height:42px;padding:0 20px 0 36px;cursor:pointer;user-select:none}
+.dockbar .last{flex:1;min-width:0;color:var(--muted);font-size:12.5px}
+.dockbar .chev{transition:transform .15s;color:var(--faint)}
+.dock.open .chev{transform:rotate(180deg)}
+.bar{position:relative;height:2px;background:transparent;overflow:hidden}
+.busy .bar{background:var(--line)}
+.busy .bar::after{content:"";position:absolute;inset:0;width:30%;background:var(--accent);animation:slide 1.1s ease-in-out infinite}
+@keyframes slide{from{transform:translateX(-100%)}to{transform:translateX(340%)}}
+.log{height:0;overflow:auto;transition:height .18s ease;padding:0 36px}
+.dock.open .log{height:210px;padding-bottom:12px}
+.log div{display:grid;grid-template-columns:64px 1fr;gap:10px;padding:2px 0;font-family:"Cascadia Mono",Consolas,monospace;font-size:12px;color:var(--muted);line-height:1.5}
+.log div time{color:var(--faint)}
+.log .ok{color:var(--ok)}.log .err{color:var(--err)}.log .warn{color:var(--warn)}.log .summary{color:var(--text);font-weight:600}
+/* overlay */
+.scrim{position:fixed;inset:0;background:rgba(5,6,8,.62);display:none;align-items:center;justify-content:center;z-index:20;backdrop-filter:blur(2px)}
+.scrim.on{display:flex;animation:in .14s}
+.modal{width:min(480px,92vw);background:var(--panel);border:1px solid var(--line2);border-radius:12px;box-shadow:0 24px 70px rgba(0,0,0,.55)}
+.modal .card-b p{color:var(--muted);line-height:1.55}
+.modal .foot{display:flex;justify-content:flex-end;gap:8px;padding:14px 18px;border-top:1px solid var(--line)}
+.diff{margin-top:14px;display:grid;gap:6px}
+.diff div{padding:9px 12px;border-radius:var(--r-sm);background:var(--bg);border:1px solid var(--line);word-break:break-word;font-size:12.5px}
+.diff small{display:block;color:var(--faint);font-size:11px;margin-bottom:2px}
+.viewer{max-width:80vw;max-height:80vh;padding:24px;background:var(--panel);border:1px solid var(--line2);border-radius:12px;text-align:center}
+.viewer img{max-width:70vw;max-height:66vh;display:block;margin:0 auto 14px;border-radius:6px;background:repeating-conic-gradient(#1c1d21 0 25%,#16171a 0 50%) 0 0/16px 16px}
+.toasts{position:fixed;right:20px;bottom:58px;display:grid;gap:8px;z-index:30}
+.toast{width:340px;padding:12px 14px;border-radius:10px;background:var(--raised);border:1px solid var(--line2);box-shadow:0 12px 30px rgba(0,0,0,.4);display:flex;gap:10px;animation:in .16s}
+.toast b{display:block;font-weight:600;margin-bottom:2px}.toast span{color:var(--muted);font-size:12.5px;line-height:1.45;word-break:break-word}
+.toast .i{width:8px;height:8px;border-radius:50%;margin-top:6px;flex:none;background:var(--ok)}.toast.err .i{background:var(--err)}.toast.warn .i{background:var(--warn)}
+.droplayer{position:fixed;inset:10px;border:2px dashed var(--accent);border-radius:14px;background:rgba(111,155,255,.06);display:none;place-items:center;z-index:40;pointer-events:none}
+.droplayer.on{display:grid}
+.droplayer div{background:var(--panel);border:1px solid var(--line2);padding:14px 20px;border-radius:10px;font-weight:600}
+</style>
+</head>
+<body>
+<div class="app" id="root">
+  <aside>
+    <div class="brand">
+      <div class="mark"><svg width="17" height="17" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3v5h5"/><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="m9 15 2 2 4-4"/></svg></div>
+      <div><b>DocReplacer</b><small id="ver">Belge hazırlama</small></div>
+    </div>
+    <div class="navlabel">Çalışma alanı</div>
+    <nav>
+      <button data-page="single" class="on"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>Tek klasör</button>
+      <button data-page="batch"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="m12 3 9 5-9 5-9-5z"/><path d="m3 13 9 5 9-5"/></svg>Toplu hazırlama<span class="count" id="nBatch"></span></button>
+      <button data-page="pdf"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h4"/></svg>PDF birleştir<span class="count" id="nPdf"></span></button>
+    </nav>
+    <div class="sidefoot"><span class="dot"></span><span id="sideStatus">Hazır</span><br>Kaynak klasör asla değiştirilmez.</div>
+  </aside>
+
+  <main>
+    <header>
+      <div><h1 id="title">Tek klasör</h1><p id="subtitle">Bir kaynak klasörden yeni işletme adına güvenli bir kopya hazırlayın.</p></div>
+    </header>
+
+    <div class="scroll">
+      <!-- SINGLE -->
+      <section class="page on" id="p-single">
+        <div class="single">
+          <div class="stack">
+            <div class="card" id="srcCard"></div>
+            <div class="card">
+              <div class="card-h"><h3>Yeni işletme</h3></div>
+              <div class="card-b stack">
+                <div>
+                  <label class="lbl">İşletme adı</label>
+                  <div class="arrow">
+                    <input class="input" id="old" placeholder="Mevcut ad" spellcheck="false">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M5 12h14M13 6l6 6-6 6"/></svg>
+                    <input class="input" id="new" placeholder="Yeni işletme adı" spellcheck="false">
+                  </div>
+                  <div class="hint">Mevcut ad FR.A4.1 belgesinden otomatik okunur; gerekirse düzenleyebilirsiniz.</div>
+                </div>
+                <div>
+                  <label class="lbl">Logo <span style="color:var(--faint);font-weight:400">· isteğe bağlı</span></label>
+                  <div class="logo-slot">
+                    <div class="logo-box" id="logoBox" title="Logo seç"></div>
+                    <div style="min-width:0;flex:1">
+                      <div class="trunc" id="logoName" style="font-weight:550">Logo seçilmedi</div>
+                      <div class="hint" style="margin-top:2px">Üst bilgideki görsel bu logo ile değiştirilir. PNG, JPG veya BMP.</div>
+                    </div>
+                    <button class="btn sm" id="logoPick">Seç</button>
+                    <button class="iconbtn" id="logoClear" title="Kaldır" style="display:none"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg></button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="stack">
+            <div class="card">
+              <div class="card-h"><h3>Çıktı</h3></div>
+              <div class="card-b stack">
+                <div class="output"><small>Yeni klasör</small><div id="outName" style="color:var(--faint)">Kaynak ve yeni ad girildiğinde görünür</div></div>
+                <label class="switch"><input type="checkbox" id="pdf"><span class="tr"></span><span><b>Birleşik PDF oluştur</b><small>Tüm belgeler tek PDF'te, yer imleriyle</small></span></label>
+                <label class="switch" style="opacity:.55;pointer-events:none"><input type="checkbox" checked><span class="tr"></span><span><b>ZIP arşivi</b><small>Doğrulama başarılıysa her zaman oluşturulur</small></span></label>
+                <button class="btn primary lg" id="go" style="width:100%">Kopyayı hazırla</button>
+              </div>
+            </div>
+            <div class="card" id="resultCard" style="display:none"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- BATCH -->
+      <section class="page" id="p-batch">
+        <div class="batch">
+          <div class="stack">
+            <div class="card">
+              <div class="card-b">
+                <label class="lbl">Kaynak klasör</label>
+                <div class="trunc" id="bSource" style="font-weight:550"></div>
+                <div class="hint" id="bSourceHint"></div>
+              </div>
+            </div>
+            <div class="card">
+              <div class="card-b stack">
+                <div>
+                  <label class="lbl">İşletme adları</label>
+                  <textarea class="input" id="names" rows="6" placeholder="Her satıra bir işletme adı yapıştırın" spellcheck="false"></textarea>
+                </div>
+                <button class="btn" id="addNames" style="width:100%">Listeye ekle</button>
+              </div>
+            </div>
+            <div class="drop" id="logoDrop">
+              <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg></div>
+              <div><b>Logoları bırakın</b><span>veya seçmek için tıklayın · adlar dosya adından eşleşir</span></div>
+            </div>
+            <button class="btn" id="matchFolder" style="width:100%">Logo klasörünü otomatik eşleştir</button>
+            <label class="switch" style="padding:4px 2px"><input type="checkbox" id="bpdf"><span class="tr"></span><span><b>Birleşik PDF de oluştur</b><small>Her kopya için ayrı PDF</small></span></label>
+          </div>
+
+          <div class="card">
+            <div class="card-h">
+              <div class="toolbar" style="width:100%">
+                <h3 id="bCount">Liste</h3><div class="grow"></div>
+                <button class="btn ghost sm" id="clearRows">Temizle</button>
+                <button class="btn primary sm" id="runBatch">Tümünü hazırla</button>
+              </div>
+            </div>
+            <div id="bTable"></div>
+          </div>
+        </div>
+      </section>
+
+      <!-- PDF -->
+      <section class="page" id="p-pdf">
+        <div class="stack">
+          <div class="drop" id="pdfDrop">
+            <div class="ico"><svg width="19" height="19" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 15V3M7 8l5-5 5 5"/><path d="M20 15v4a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-4"/></svg></div>
+            <div><b>Klasör veya ZIP bırakın</b><span>Word, Excel, PowerPoint, görsel ve PDF dosyaları tek PDF'te birleştirilir</span></div>
+            <div style="margin-left:auto;display:flex;gap:8px"><button class="btn sm" id="pdfAddFolder">Klasör ekle</button><button class="btn sm" id="pdfAddZip">ZIP ekle</button></div>
+          </div>
+          <div class="card">
+            <div class="card-h"><div class="toolbar" style="width:100%"><h3 id="pCount">Kuyruk</h3><div class="grow"></div><button class="btn ghost sm" id="pdfClear">Temizle</button><button class="btn primary sm" id="pdfRun">PDF oluştur</button></div></div>
+            <div id="pTable"></div>
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="dock" id="dock">
+      <div class="bar"></div>
+      <div class="dockbar" id="dockbar">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="color:var(--faint)"><path d="M4 6h16M4 12h16M4 18h10"/></svg>
+        <span class="last trunc" id="last">Etkinlik günlüğü</span>
+        <button class="btn ghost sm" id="clearLog" onclick="event.stopPropagation()">Temizle</button>
+        <svg class="chev" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="m6 15 6-6 6 6"/></svg>
+      </div>
+      <div class="log" id="log"></div>
+    </div>
+  </main>
+</div>
+
+<div class="scrim" id="scrim"></div>
+<div class="toasts" id="toasts"></div>
+<div class="droplayer" id="droplayer"><div id="dropText">Bırakın</div></div>
+
+<script>
+const $=s=>document.querySelector(s);
+const esc=s=>String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const base=p=>String(p||"").split(/[\\/]/).filter(Boolean).pop()||"";
+const IC={
+  folder:'<svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/></svg>',
+  img:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>',
+  x:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 6 6 18M6 6l12 12"/></svg>',
+  open:'<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h6v6M10 14 21 3M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/></svg>',
+  zip:'<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M11 3v2M11 7v2M11 11v2"/></svg>',
+};
+const PAGES={single:["Tek klasör","Bir kaynak klasörden yeni işletme adına güvenli bir kopya hazırlayın."],
+  batch:["Toplu hazırlama","Birçok işletme için kopya, ZIP ve PDF'i tek seferde üretin."],
+  pdf:["PDF birleştir","Bir klasörü veya ZIP arşivini yer imli tek bir PDF'e dönüştürün."]};
+let api, S={page:"single",folder:"",info:null,logo:"",busy:false,rows:[],pdfs:[],thumbs:{}};
+const uid=()=>Math.random().toString(36).slice(2,10);
+
+const app={
+  emit(ev,p){
+    if(ev==="log")addLog(p);
+    else if(ev==="progress"){$("#sideStatus").textContent=p||"Hazır";if(p)$("#last").textContent=p;}
+    else if(ev==="busy"){S.busy=p;$("#root").classList.toggle("busy",p);syncButtons();}
+    else if(ev==="toast")toast(p.kind,p.title,p.text);
+    else if(ev==="single_done")singleDone(p);
+    else if(ev==="row"){const r=S.rows.find(x=>x.id===p.id);if(r){Object.assign(r,{status:p.status,label:p.label});if(p.folder)r.out=p.folder;renderBatch();}}
+    else if(ev==="batch_done")toast(p.ok===p.total?"ok":"warn","Toplu işlem bitti",`${p.ok}/${p.total} işletme başarıyla hazırlandı.`);
+    else if(ev==="pdfrow"){const r=S.pdfs.find(x=>x.id===p.id);if(r){Object.assign(r,{status:p.status,label:p.label});if(p.output)r.output=p.output;renderPdf();}}
+  },
+  async onDrop(items){
+    $("#droplayer").classList.remove("on");
+    if(S.busy||!items.length)return;
+    if(S.page==="single"){
+      const f=items.find(i=>i.type==="folder"),im=items.find(i=>i.type==="image");
+      if(f)setFolder(f.path);
+      if(im)setLogo(im.path);
+    }else if(S.page==="batch"){
+      const paths=items.filter(i=>i.type==="image"||i.type==="folder").map(i=>i.path);
+      addLogos(await api.describe_logos(paths));
+    }else{
+      items.filter(i=>i.type==="folder"||i.type==="zip").forEach(i=>addPdf(i.path));
+    }
+  }
+};
+window.app=app;
+
+function addLog({text,tag,t}){
+  const d=document.createElement("div");
+  d.innerHTML=`<time>${esc(t)}</time><span class="${esc(tag)}">${esc(text)}</span>`;
+  const log=$("#log");log.appendChild(d);log.scrollTop=log.scrollHeight;
+  $("#last").textContent=text;
+}
+function toast(kind,title,text){
+  const el=document.createElement("div");el.className="toast "+kind;
+  el.innerHTML=`<span class="i"></span><div><b>${esc(title)}</b><span>${esc(text||"")}</span></div>`;
+  $("#toasts").appendChild(el);setTimeout(()=>el.remove(),kind==="err"?7000:4200);
+}
+function modal(html){const s=$("#scrim");s.innerHTML=html;s.classList.add("on");return s;}
+function closeModal(){$("#scrim").classList.remove("on");$("#scrim").innerHTML="";}
+$("#scrim").addEventListener("mousedown",e=>{if(e.target.id==="scrim")closeModal();});
+document.addEventListener("keydown",e=>{if(e.key==="Escape")closeModal();});
+function confirmBox(title,body,ok="Onayla"){
+  return new Promise(res=>{
+    const s=modal(`<div class="modal"><div class="card-h"><h3>${esc(title)}</h3></div><div class="card-b">${body}</div>
+      <div class="foot"><button class="btn ghost" data-v="0">Vazgeç</button><button class="btn primary" data-v="1">${esc(ok)}</button></div></div>`);
+    s.querySelectorAll("[data-v]").forEach(b=>b.onclick=()=>{closeModal();res(b.dataset.v==="1");});
+  });
+}
+async function viewLogo(path,name){
+  const src=await api.logo_preview(path,900);
+  if(!src)return toast("err","Logo açılamadı",base(path));
+  modal(`<div class="viewer"><img src="${src}"><b>${esc(name||base(path))}</b><div class="hint mono">${esc(base(path))}</div></div>`).querySelector(".viewer").onclick=closeModal;
+}
+
+/* navigation */
+document.querySelectorAll("nav button").forEach(b=>b.onclick=()=>go(b.dataset.page));
+function go(p){
+  S.page=p;
+  document.querySelectorAll("nav button").forEach(b=>b.classList.toggle("on",b.dataset.page===p));
+  document.querySelectorAll(".page").forEach(x=>x.classList.toggle("on",x.id==="p-"+p));
+  $("#title").textContent=PAGES[p][0];$("#subtitle").textContent=PAGES[p][1];
+  if(p==="batch")renderBatchSource();
+}
+$("#dockbar").onclick=()=>$("#dock").classList.toggle("open");
+$("#clearLog").onclick=()=>{$("#log").innerHTML="";$("#last").textContent="Etkinlik günlüğü";};
+
+/* window-level drag feedback (actual paths arrive from Python) */
+let dragDepth=0;
+window.addEventListener("dragenter",e=>{e.preventDefault();dragDepth++;if(!S.busy){$("#dropText").textContent={single:"Kaynak klasörü veya logoyu bırakın",batch:"Logoları bırakın",pdf:"Klasör veya ZIP bırakın"}[S.page];$("#droplayer").classList.add("on");}});
+window.addEventListener("dragleave",()=>{if(--dragDepth<=0){dragDepth=0;$("#droplayer").classList.remove("on");}});
+window.addEventListener("dragover",e=>e.preventDefault());
+window.addEventListener("drop",()=>{dragDepth=0;$("#droplayer").classList.remove("on");});
+
+/* SINGLE */
+function renderSource(){
+  const c=$("#srcCard"),i=S.info;
+  if(!S.folder){
+    c.innerHTML=`<div class="drop" id="srcDrop" style="border:0;border-radius:var(--r);padding:30px 22px">
+      <div class="ico">${IC.folder}</div><div><b>Kaynak klasörü seçin</b><span>Klasörü buraya sürükleyin veya göz atmak için tıklayın. Klasör adı “Başlık - İşletme - Yıl” biçiminde olmalıdır.</span></div></div>`;
+    $("#srcDrop").onclick=pickFolder;return;
+  }
+  let notice="";
+  if(i&&i.error)notice=`<div class="notice"><span class="pill err">Okunamadı</span><span class="grow">${esc(i.error)}</span></div>`;
+  else if(i&&i.state==="differs")notice=`<div class="notice"><span class="pill warn">Ad farklı</span><span class="grow trunc">Klasör adı FR.A4.1 ile eşleşmiyor.</span><button class="btn sm" id="syncBtn">Klasör adını eşitle</button></div>`;
+  else if(i&&i.state==="unparsed")notice=`<div class="notice"><span class="pill warn">Biçim</span><span class="grow">Klasör adı “Başlık - İşletme - Yıl” biçiminde değil; kopya adı oluşturulamaz.</span></div>`;
+  c.innerHTML=`<div class="source"><div class="ico">${IC.folder}</div>
+    <div class="meta"><b class="trunc">${esc(base(S.folder))}</b><span class="trunc mono" style="display:block">${esc(S.folder)}</span></div>
+    <button class="iconbtn" id="openSrc" title="Explorer'da aç">${IC.open}</button><button class="btn sm" id="chgSrc">Değiştir</button></div>
+    ${i&&!i.error?`<div class="facts"><div><small>FR.A4.1'deki ad</small><b class="trunc" style="display:block">${esc(i.name)}</b></div>
+      <div><small>Word belgesi</small><b>${i.docx}</b></div>
+      <div><small>Durum</small>${i.state==="match"?'<span class="pill ok">Eşleşiyor</span>':i.state==="differs"?'<span class="pill warn">Ad farklı</span>':'<span class="pill">Biçim dışı</span>'}</div></div>`:""}${notice}`;
+  $("#chgSrc").onclick=pickFolder;
+  $("#openSrc").onclick=()=>api.open_path(S.folder);
+  const sb=$("#syncBtn");if(sb)sb.onclick=syncFolder;
+}
+async function pickFolder(){if(S.busy)return;const f=await api.pick_folder();if(f)setFolder(f);}
+async function setFolder(f){
+  S.folder=f;S.info=null;renderSource();api.save({folder:f});
+  const i=await api.inspect(f);S.info=i;
+  if(!i.error){S.folder=i.folder;$("#old").value=i.name;addLog({text:`Kaynak okundu: ${i.name} (${i.fr})`,tag:"ok",t:now()});}
+  else addLog({text:i.error,tag:"err",t:now()});
+  renderSource();updateOut();renderBatchSource();
+}
+async function syncFolder(){
+  const i=S.info;
+  const ok=await confirmBox("Klasörü yeniden adlandır",`<p>Klasör adı FR.A4.1'deki işletme adıyla eşitlenecek.</p>
+    <div class="diff"><div><small>Şu anki</small>${esc(i.folder_name)}</div><div><small>Yeni</small>${esc(i.target_name)}</div></div>`,"Yeniden adlandır");
+  if(!ok)return;
+  const r=await api.sync_folder(S.folder);
+  if(r.error)return toast("err","Yeniden adlandırılamadı",r.error);
+  toast("ok","Klasör yeniden adlandırıldı",base(r.folder));setFolder(r.folder);
+}
+function setLogo(p){
+  S.logo=p||"";api.save({logo:S.logo});
+  $("#logoName").textContent=p?base(p):"Logo seçilmedi";
+  $("#logoClear").style.display=p?"":"none";
+  const box=$("#logoBox");box.innerHTML=IC.img;
+  if(p)api.logo_preview(p,128).then(src=>{if(src&&S.logo===p)box.innerHTML=`<img src="${src}">`;});
+}
+$("#logoPick").onclick=async()=>{const f=await api.pick_logo();if(f)setLogo(f);};
+$("#logoBox").onclick=()=>S.logo?viewLogo(S.logo,$("#new").value||"Logo"):$("#logoPick").click();
+$("#logoClear").onclick=()=>setLogo("");
+let outT;
+function updateOut(){
+  clearTimeout(outT);outT=setTimeout(async()=>{
+    const n=$("#new").value.trim(),el=$("#outName");
+    const name=S.folder&&n?await api.preview_target(S.folder,n):"";
+    el.textContent=name||"Kaynak ve yeni ad girildiğinde görünür";el.style.color=name?"":"var(--faint)";
+  },120);
+}
+$("#new").addEventListener("input",updateOut);
+$("#new").addEventListener("keydown",e=>{if(e.key==="Enter")$("#go").click();});
+$("#pdf").onchange=e=>api.save({create_pdf:e.target.checked});
+$("#go").onclick=async()=>{
+  const v={folder:S.folder,old:$("#old").value.trim(),new:$("#new").value.trim(),logo:S.logo,pdf:$("#pdf").checked};
+  if(!v.folder)return toast("warn","Kaynak klasör gerekli","Önce bir kaynak klasör seçin.");
+  if(!v.old||!v.new)return toast("warn","Ad eksik","Mevcut ve yeni işletme adını girin.");
+  if(v.old.toLocaleLowerCase("tr")===v.new.toLocaleLowerCase("tr"))return toast("warn","Aynı ad","Yeni ad mevcut adla aynı olamaz.");
+  $("#resultCard").style.display="none";
+  const r=await api.prepare_single(v);if(r.error)toast("err","Başlatılamadı",r.error);
+};
+function singleDone(p){
+  const c=$("#resultCard");c.style.display="";
+  c.innerHTML=`<div class="card-h"><h3>${p.ok?"Hazır":"Tamamlanamadı"}</h3>${p.ok?'<span class="pill ok">Doğrulandı</span>':'<span class="pill err">Hata var</span>'}</div>
+   <div class="card-b"><div class="trunc" style="font-weight:600">${esc(p.folder_name)}</div>
+   <div class="summary"><div><b>${p.changed}</b><small>Güncellendi</small></div><div><b>${p.unchanged}</b><small>Değişmedi</small></div><div><b style="color:${p.failed?"var(--err)":"inherit"}">${p.failed}</b><small>Hata</small></div></div>
+   <div style="display:flex;gap:8px;flex-wrap:wrap">
+    <button class="btn sm" data-o="${esc(p.folder)}">${IC.open} Klasörü aç</button>
+    ${p.zip?`<button class="btn sm" data-r="${esc(p.zip)}">ZIP'i göster</button>`:""}
+    ${p.pdf?`<button class="btn sm" data-o="${esc(p.pdf)}">PDF'i aç · ${p.pages} sayfa</button>`:""}
+   </div>
+   ${p.ok?`<div class="hint" style="margin-top:12px">Yeni kopya bir sonraki işlem için kaynak olarak ayarlandı.</div>`:""}</div>`;
+  c.querySelectorAll("[data-o]").forEach(b=>b.onclick=()=>api.open_path(b.dataset.o));
+  c.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>api.open_path(b.dataset.r,true));
+  if(p.ok){toast("ok","Kopya hazır",p.folder_name);$("#new").value="";setLogo("");setFolder(p.folder);}
+  else toast("err","İşlem tamamlanamadı",`${p.failed} belgede hata var. Ayrıntılar günlükte.`);
+}
+
+/* BATCH */
+function renderBatchSource(){
+  $("#bSource").textContent=S.folder?base(S.folder):"Seçilmedi";
+  $("#bSourceHint").innerHTML=S.folder?(S.info&&!S.info.error?`Mevcut ad: <b style="color:var(--muted)">${esc(S.info.name)}</b>`:"")
+    :`Kaynak klasörü <a href="#" style="color:var(--accent)" onclick="go('single');return false">Tek klasör</a> sayfasından seçin.`;
+}
+$("#addNames").onclick=()=>{
+  let n=0;
+  $("#names").value.split(/\r?\n/).map(s=>s.replace(/\s+/g," ").trim()).filter(Boolean).forEach(name=>{
+    if(S.rows.some(r=>r.name.toLocaleLowerCase("tr")===name.toLocaleLowerCase("tr")))return;
+    S.rows.push({id:uid(),name,logo:"",thumb:"",status:"wait",label:"Bekliyor"});n++;
+  });
+  if(n){$("#names").value="";toast("ok",`${n} işletme eklendi`,"");}
+  renderBatch();
+};
+async function keyOf(s){return api.key(s);}
+async function addLogos(list){
+  if(!list||!list.length)return;
+  let added=0,matched=0;
+  const keys=await Promise.all(S.rows.map(r=>keyOf(r.name)));
+  for(const l of list){
+    const idx=S.rows.findIndex((r,i)=>!r.logo&&keys[i]===l.key);
+    if(idx>=0){Object.assign(S.rows[idx],{logo:l.path,thumb:l.thumb,status:"wait",label:"Logo eşleşti"});matched++;}
+    else{S.rows.push({id:uid(),name:l.guess||l.file,logo:l.path,thumb:l.thumb,status:"check",label:"Adı kontrol edin"});keys.push(l.key);added++;}
+  }
+  toast("ok","Logolar işlendi",`${added} yeni satır · ${matched} eşleşme`);renderBatch();
+}
+$("#logoDrop").onclick=async()=>{if(!S.busy)addLogos(await api.pick_logos());};
+$("#matchFolder").onclick=async()=>{
+  const names=S.rows.filter(r=>!r.logo).map(r=>r.name);
+  if(!names.length)return toast("warn","Eşleştirilecek satır yok","Önce logosu olmayan işletmeleri listeye ekleyin.");
+  const res=await api.match_logo_folder(names);if(!res)return;
+  let n=0;S.rows.forEach(r=>{const m=res[r.name];if(m&&!r.logo){Object.assign(r,{logo:m.path,thumb:m.thumb,label:"Logo eşleşti",status:"wait"});n++;}});
+  toast(n?"ok":"warn",`${n} logo eşleştirildi`,n<names.length?`${names.length-n} işletme için logo bulunamadı.`:"");renderBatch();
+};
+$("#clearRows").onclick=()=>{if(!S.busy){S.rows=[];renderBatch();}};
+$("#bpdf").onchange=e=>api.save({batch_pdf:e.target.checked});
+$("#runBatch").onclick=async()=>{
+  if(!S.folder)return toast("warn","Kaynak klasör gerekli","Tek klasör sayfasından kaynak seçin.");
+  const rows=S.rows.filter(r=>r.status!=="ok");
+  if(!rows.length)return toast("warn","Liste boş","Önce işletme adı veya logo ekleyin.");
+  const r=await api.run_batch(S.folder,rows.map(x=>({id:x.id,name:x.name,logo:x.logo})),$("#bpdf").checked);
+  if(r.error)toast("err","Başlatılamadı",r.error);
+};
+function statusPill(r){
+  const cls={ok:"ok",err:"err",run:"run",check:"warn"}[r.status]||"";
+  return `<span class="pill ${cls}">${esc(r.label)}</span>`;
+}
+function renderBatch(){
+  const n=S.rows.length;$("#nBatch").textContent=n||"";
+  $("#bCount").textContent=n?`${n} işletme`:"Liste";
+  if(!n){$("#bTable").innerHTML=`<div class="empty">${IC.img.replace('width="18" height="18"','width="26" height="26"')}<b>Liste boş</b>İsimleri yapıştırın veya logoları sürükleyip bırakın.</div>`;return;}
+  $("#bTable").innerHTML=`<table><thead><tr><th style="width:68px">Logo</th><th>İşletme adı</th><th style="width:160px">Durum</th><th style="width:84px"></th></tr></thead><tbody>${
+    S.rows.map(r=>`<tr data-id="${r.id}">
+      <td><div class="thumb" data-act="view">${r.thumb?`<img src="${r.thumb}">`:IC.img}</div></td>
+      <td><input class="cell" value="${esc(r.name)}" ${S.busy?"disabled":""} spellcheck="false"><div class="hint mono trunc" style="margin:2px 0 0 10px">${esc(r.logo?base(r.logo):"Logo yok")}</div></td>
+      <td>${statusPill(r)}</td>
+      <td style="text-align:right">${r.out?`<button class="iconbtn" data-act="open" title="Klasörü aç">${IC.open}</button>`:""}<button class="iconbtn" data-act="del" title="Kaldır" ${S.busy?"disabled":""}>${IC.x}</button></td></tr>`).join("")}</tbody></table>`;
+  $("#bTable").querySelectorAll("tr[data-id]").forEach(tr=>{
+    const r=S.rows.find(x=>x.id===tr.dataset.id);
+    tr.querySelector("input").onchange=e=>{const v=e.target.value.replace(/\s+/g," ").trim();if(v){r.name=v;if(r.status!=="ok"){r.status="wait";r.label="Bekliyor";}}renderBatch();};
+    tr.querySelector("[data-act=view]").onclick=async()=>{
+      if(r.logo)return viewLogo(r.logo,r.name);
+      if(S.busy)return;const l=await api.pick_logos();if(l&&l[0]){Object.assign(r,{logo:l[0].path,thumb:l[0].thumb,status:"wait",label:"Logo eklendi"});renderBatch();}
+    };
+    tr.querySelector("[data-act=del]").onclick=()=>{S.rows=S.rows.filter(x=>x!==r);renderBatch();};
+    const o=tr.querySelector("[data-act=open]");if(o)o.onclick=()=>api.open_path(r.out);
+  });
+}
+
+/* PDF */
+function addPdf(path){if(!S.pdfs.some(p=>p.path===path))S.pdfs.push({id:uid(),path,status:"wait",label:"Bekliyor"});renderPdf();}
+$("#pdfDrop").onclick=async e=>{if(e.target.closest("button")||S.busy)return;const f=await api.pick_folder();if(f)addPdf(f);};
+$("#pdfAddFolder").onclick=async()=>{const f=await api.pick_folder();if(f)addPdf(f);};
+$("#pdfAddZip").onclick=async()=>{(await api.pick_zips()).forEach(addPdf);};
+$("#pdfClear").onclick=()=>{if(!S.busy){S.pdfs=[];renderPdf();}};
+$("#pdfRun").onclick=async()=>{
+  const items=S.pdfs.filter(p=>p.status!=="ok");
+  if(!items.length)return toast("warn","Kuyruk boş","Önce bir klasör veya ZIP ekleyin.");
+  const r=await api.run_pdfs(items.map(p=>({id:p.id,path:p.path})));if(r.error)toast("err","Başlatılamadı",r.error);
+};
+function renderPdf(){
+  const n=S.pdfs.length;$("#nPdf").textContent=n||"";$("#pCount").textContent=n?`${n} kaynak`:"Kuyruk";
+  if(!n){$("#pTable").innerHTML=`<div class="empty"><b>Kuyruk boş</b>Birleştirmek istediğiniz klasörleri veya ZIP arşivlerini ekleyin.</div>`;return;}
+  $("#pTable").innerHTML=`<table><thead><tr><th style="width:52px"></th><th>Kaynak</th><th style="width:150px">Durum</th><th style="width:84px"></th></tr></thead><tbody>${
+    S.pdfs.map(p=>`<tr data-id="${p.id}"><td style="color:var(--muted)">${/\.zip$/i.test(p.path)?IC.zip:IC.folder}</td>
+      <td><div class="trunc" style="font-weight:550">${esc(base(p.path))}</div><div class="hint mono trunc" style="margin-top:2px">${esc(p.path)}</div></td>
+      <td>${statusPill(p)}</td>
+      <td style="text-align:right">${p.output?`<button class="iconbtn" data-act="open" title="PDF'i aç">${IC.open}</button>`:""}<button class="iconbtn" data-act="del" ${S.busy?"disabled":""}>${IC.x}</button></td></tr>`).join("")}</tbody></table>`;
+  $("#pTable").querySelectorAll("tr[data-id]").forEach(tr=>{
+    const p=S.pdfs.find(x=>x.id===tr.dataset.id);
+    tr.querySelector("[data-act=del]").onclick=()=>{S.pdfs=S.pdfs.filter(x=>x!==p);renderPdf();};
+    const o=tr.querySelector("[data-act=open]");if(o)o.onclick=()=>api.open_path(p.output);
+  });
+}
+
+function syncButtons(){
+  ["#go","#runBatch","#clearRows","#addNames","#matchFolder","#pdfRun","#pdfClear","#logoPick"].forEach(s=>$(s).disabled=S.busy);
+  $("#go").textContent=S.busy?"İşleniyor…":"Kopyayı hazırla";
+  renderBatch();renderPdf();
+}
+const now=()=>new Date().toTimeString().slice(0,8);
+
+window.addEventListener("pywebviewready",async()=>{
+  api=window.pywebview.api;
+  const st=await api.get_state();
+  $("#ver").textContent="Sürüm "+st.version;
+  $("#pdf").checked=st.create_pdf;$("#bpdf").checked=st.batch_pdf;
+  renderSource();renderBatch();renderPdf();
+  if(st.folder)setFolder(st.folder);
+  if(st.logo)setLogo(st.logo);
+});
+</script>
+</body>
+</html>
