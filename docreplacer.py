@@ -16,7 +16,7 @@ from webview.dom import DOMEventHandler
 from PIL import Image, ImageOps
 
 import docreplacer_core as core
-from pdf_combine import combine_to_pdf
+from pdf_combine import prewarm_office, combine_to_pdf
 
 RESOURCE_DIR = Path(getattr(sys, "_MEIPASS", Path(__file__).resolve().parent))
 UI_FILE = RESOURCE_DIR / "ui" / "docreplacer.html"
@@ -56,6 +56,9 @@ def thumbnail(path, size=96):
         return ""
 
 
+APP_TITLE = "DocReplacer"
+
+
 class Api:
     def __init__(self):
         self._window = None
@@ -87,6 +90,7 @@ class Api:
             except Exception as exc:  # surfaced to UI
                 self._log(f"Hata: {exc}", "err")
                 self._emit("toast", {"kind": "err", "title": "İşlem başarısız", "text": str(exc)})
+                notify(self._window, "İşlem başarısız", str(exc), ok=False)
             finally:
                 self.busy = False
                 self._progress("")
@@ -153,6 +157,7 @@ class Api:
         return out
 
     def inspect(self, folder):
+        prewarm_office()
         try:
             d = core.inspect_folder(folder)
         except Exception as exc:
@@ -197,6 +202,7 @@ class Api:
                 self._progress("Birleşik PDF hazırlanıyor…")
                 pdf = combine_to_pdf(result["folder"], log=self._log, progress=self._progress)
                 self._log(f"PDF hazır: {pdf['output'].name} ({pdf['pages']} sayfa)", "ok")
+            notify(self._window, "Klasör hazır", f"{v['new']} için hazırlama tamamlandı.")
             self._emit("single_done", {
                 "ok": result["ok"], "folder": str(result["folder"]),
                 "folder_name": Path(result["folder"]).name,
@@ -300,6 +306,7 @@ class Api:
             pdf_pool.shutdown()
             self._log(f"Toplu işlem tamamlandı: {ok[0]}/{len(rows)} başarılı.", "summary")
             self._emit("batch_done", {"ok": ok[0], "total": len(rows)})
+            notify(self._window, "Toplu işlem bitti", f"{ok[0]}/{len(rows)} işletme hazırlandı.", ok[0] == len(rows))
         return self._run(job)
 
     # ---- pdf ------------------------------------------------------------
@@ -315,10 +322,50 @@ class Api:
                 except Exception as exc:
                     self._log(f"PDF hatası ({Path(it['path']).name}): {exc}", "err")
                     self._emit("pdfrow", {"id": it["id"], "status": "err", "label": "Hata"})
+            notify(self._window, "PDF hazır", f"{len(items)} PDF birleştirme tamamlandı.")
         return self._run(job)
 
 
+def notify(window, title, text, ok=True):
+    """Finish sound plus a Windows notification, so a long job can run in the background."""
+    try:
+        import winsound
+        winsound.PlaySound("SystemAsterisk" if ok else "SystemHand",
+                           winsound.SND_ALIAS | winsound.SND_ASYNC)
+    except Exception:
+        pass
+    try:
+        import clr  # noqa: F401
+        from System import Action
+        from System.Drawing import Icon
+        from System.Windows.Forms import NotifyIcon, ToolTipIcon
+
+        def show():
+            tray = NotifyIcon()
+            tray.Icon = Icon(str(RESOURCE_DIR / "ui" / "app.ico"))
+            tray.Text = APP_TITLE
+            tray.Visible = True
+            tray.ShowBalloonTip(6000, title, text, ToolTipIcon.Info if ok else ToolTipIcon.Warning)
+            threading.Timer(12, lambda: window.native.Invoke(Action(tray.Dispose))).start()
+
+        window.native.Invoke(Action(show))
+    except Exception:
+        pass
+
+
+def set_window_icon(window):
+    try:
+        import clr  # noqa: F401  (pythonnet, loaded by pywebview)
+        from System import Action
+        from System.Drawing import Icon
+        icon = Icon(str(RESOURCE_DIR / "ui" / "app.ico"))
+        window.native.Invoke(Action(lambda: setattr(window.native, "Icon", icon)))
+    except Exception:
+        pass
+
+
 def style_titlebar(window):
+    set_window_icon(window)
     """Dark, colour-matched native title bar on Windows 11."""
     try:
         hwnd = window.native.Handle.ToInt32()
@@ -332,6 +379,10 @@ def style_titlebar(window):
 
 
 def main():
+    try:
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("ZenLapis.DocReplacer")
+    except Exception:
+        pass
     api = Api()
     geo = api.settings.get("window", {})
     window = webview.create_window(

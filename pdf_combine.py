@@ -156,7 +156,7 @@ class _OfficeWorker:
             self.app = None
 
 
-IDLE_SECONDS = 120
+IDLE_SECONDS = 600
 CACHE_DIR = Path(os.getenv("LOCALAPPDATA", tempfile.gettempdir())) / "DocReplacer" / "pdf-cache"
 CACHE_LIMIT = 800 * 1024 * 1024
 
@@ -205,6 +205,10 @@ class _OfficePool:
         pythoncom.CoInitialize()
         office = _OfficeWorker(self.kind)
         try:
+            try:
+                office._start()  # warm up before the first job arrives
+            except Exception:
+                office.quit()
             while True:
                 try:
                     job = self.jobs.get(timeout=IDLE_SECONDS)
@@ -227,6 +231,14 @@ class _OfficePool:
         finally:
             office.quit()
             pythoncom.CoUninitialize()
+
+    def warm(self, n_workers):
+        with self.lock:
+            self.threads = [t for t in self.threads if t.is_alive()]
+            while len(self.threads) < min(n_workers, self.size):
+                thread = threading.Thread(target=self._worker, daemon=True)
+                thread.start()
+                self.threads.append(thread)
 
     def shutdown(self):
         with self.lock:
@@ -253,6 +265,14 @@ def _pool(kind):
 def shutdown_office():
     for pool in list(_POOLS.values()):
         pool.shutdown()
+
+
+def prewarm_office():
+    """Start hidden Word instances in the background so the next PDF starts instantly."""
+    try:
+        _pool("word").warm(max(1, min(MAX_WORD_WORKERS, (os.cpu_count() or 4) // 2)))
+    except Exception:
+        pass
 
 
 def _run_office_pool(kind, jobs, n_workers, on_done):
